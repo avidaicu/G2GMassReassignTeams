@@ -1,0 +1,231 @@
+<aura:component controller="G2GMassReassignTeams" implements="force:appHostable" access="global" >
+    <aura:attribute name="acc" type="Account"
+                    default="{ 'sobjectType': 'Account',
+                             'Agent_URN__c': '','TM_Region__c': '','TM_SubRegion__c': '',
+                             'TM_Country__c': '','TM_State__c': '','TM_City__c': '','HE_Tier__c': ''}" />
+    <!-- Attribute Declration For Pagination -->
+    <aura:attribute name="accounts" type="Account[]"/>
+    <aura:attribute name="acccolumns" type="List"/>
+    <aura:attribute name="sortedBy" type="String" default="Name"/>
+    <aura:attribute name="sortedDirection" type="String" default="asc"/>
+    <aura:attribute name="listViewOptions" type="List" />
+    <aura:attribute name="selectedMember" type="String" />
+    
+    <aura:attribute name="selection" type="List" />
+    <aura:attribute name="thisPageRowsSelected" type="List" />
+    
+    <aura:attribute name="centers" type="List" />
+    <aura:attribute name="products" type="List" />
+    <aura:attribute name="centerValue" type="String" />
+    <aura:attribute name="productValue" type="String" />
+    
+    <aura:attribute name="isSending" type="boolean" />
+    <aura:attribute name="isError" type="boolean" default="false" />
+   
+    <aura:attribute name="pageSize" type="Integer" default="12"/>
+    <aura:attribute name="thisPageOppList" type="Account"/>
+    <aura:attribute name="currentPage" type="Integer" default="1"/>
+    <aura:attribute name="totalPages" type="Integer" default="1"/>
+    <aura:attribute name="pagesArray" type="List"/>
+    <aura:attribute name="pagesStartRecord" type="Integer"/>
+    <aura:attribute name="pagesEndRecord" type="Integer"/>
+    <aura:attribute name="pagesTotalRecord" type="Integer"/>
+    <aura:attribute name="pageNumber" type="Integer"/>
+    
+    <aura:handler name="init" value="{!this}" action="{!c.loadOptions}" />
+    <article class="slds-card">
+        <div class="slds-card__header slds-grid">
+            <header class="slds-media slds-media_center slds-has-flexi-truncate slds-p-horizontal_medium">
+                <div class="slds-media__body">
+                    <b> <h2 class="slds-card__header-title slds-align_absolute-center slds-text-heading_medium" >
+                        <span>Mass reassign account/opportunity team members</span>
+                        </h2></b>
+                </div>
+            </header>
+        </div>
+        <div class="slds-card__body slds-card__body_inner">
+            <div class="slds-grid slds-gutters ">  
+                <div class="slds-col slds-size_2-of-12"> </div>
+                <div class="slds-col slds-size_8-of-12 ">
+                    <div class="slds-grid slds-gutters ">  
+                        <div class="slds-col form-group slds-size_1-of-3">
+                            <lightning:select aura:id="selectMember" value="{!v.selectedMember}" 
+                                              onchange="{!c.handleChange}" name="selectMember" label="Team member role:" required="true">
+                                <option value="Select Team Role">Select team role</option>
+                                <aura:iteration items="{!v.listViewOptions}" var="ind" indexVar="key">
+                                    <option text="{!ind.value}" value="{!ind.key}" selected="{!ind.key==v.selectedMember}" />
+                                </aura:iteration>
+                            </lightning:select>
+                        </div>
+                        
+                        <!-- Conditional centre selection -->
+                        <aura:if isTrue="{!v.selectedMember == 'Centre Specialist'}">
+                            <div class="slds-col form-group slds-size_1-of-3">
+                                    <lightning:select aura:id="selectCenter" value="{!v.centerValue}" 
+                                                      onchange="{!c.handleChange}" name="selectCenter" label="Centers for center specialist role:" required="true">
+                                        <option value="Select Centre">Select centre</option>
+                                        <aura:iteration items="{!v.centers}" var="ind" indexVar="key">
+                                            <option text="{!ind.value}" value="{!ind.key}"  disabled="{!(v.selectedMember != 'Centre Specialist')}" 
+                                                    selected="{!ind.key==v.centerValue}" />
+                                        </aura:iteration>
+                                    </lightning:select>
+                            </div>
+						</aura:if>
+                        
+                        <!-- Conditional product specialist -->
+                        <aura:if isTrue="{!v.selectedMember == 'Product Specialist'}">
+                            <div class="slds-col form-group slds-size_1-of-3">
+                                    <lightning:select aura:id="selectProduct" value="{!v.productValue}" 
+                                                      onchange="{!c.handleChange}" name="selectProduct" label="Products" required="true">
+                                        <option value="Select product">Select product</option>
+                                        <aura:iteration items="{!v.products}" var="ind" indexVar="key">
+                                            <option text="{!ind.value}" value="{!ind.key}"  disabled="{!(v.selectedMember != 'Product Specialist')}" 
+                                                    selected="{!ind.key==v.productValue}" />
+                                        </aura:iteration>
+                                    </lightning:select>
+                            </div>
+						</aura:if>
+                        
+                        <div class="slds-col slds-p-horizontal_medium slds-p-horizontal_medium s slds-size_1-of-3">  
+                            <label class="slds-form-element__label">New team member name</label>
+                            <c:Lookup objectName="User"
+                                      field_API_text="Name"
+                                      field_API_val="Id"
+                                      limit="100"
+                                      field_API_search="Username"
+                                      lookupIcon="standard:user" 
+                                      selItem="{!v.selItem}" 
+                                      placeholder="Enter space after the User Name to search Users." />
+                        </div>
+                    </div>
+                </div>  
+            </div> 
+            <div><b>Filters:</b>
+            </div> 
+            <div class="slds-grid slds-gutters ">
+                <div class="slds-col slds-size_1-of-8"> <lightning:input name="Agent_Urn" label="AgentURN" value="{!v.acc.Agent_URN__c }"/></div>
+                <div class="slds-col slds-size_1-of-8"> <lightning:input aura:id="Region" name="Region" label="Region" value="{!v.acc.TM_Region__c }" /></div> 
+                <div class="slds-col slds-size_1-of-8"> <lightning:input name="Subregion" label="Subregion" value="{!v.acc.TM_SubRegion__c }" /></div>
+                <div class="slds-col slds-size_1-of-8"> <lightning:input name="Country" label="Country" value="{!v.acc.TM_Country__c }"/></div> 
+                <div class="slds-col slds-size_1-of-8"> <lightning:input name="State" label="State" value="{!v.acc.TM_State__c }" /></div>
+                <div class="slds-col slds-size_1-of-8"> <lightning:input name="City" label="City" value="{!v.acc.TM_City__c }" /></div>
+                <div class="slds-col slds-size_1-of-87"> <lightning:input name="Tier" label="Tier" value="{!v.acc.HE_Tier__c }" /></div>
+                <div class="slds-col slds-size_1-of-87">
+                    <lightning:button label="Select Agents" variant="brand" 
+                                      onclick="{!c.fetchAgents}" class="slds-m-left_x-small"/>  </div>
+            </div>  
+            
+            <div class="results">
+        	<!-- START SPINNER: Show the loading screen while Client side controller(JS) 
+             is communicating with Server Side(APEX) controller -->
+            <aura:if isTrue="{!v.isSending == true}">
+                <div class="slds-spinner_container">
+                    <div class="slds-spinner--brand slds-spinner slds-spinner--large" role="alert">
+                        <span class="slds-assistive-text">Loading</span>
+                        <div class="slds-spinner__dot-a"></div>
+                        <div class="slds-spinner__dot-b"></div>
+                    </div>
+                </div>
+            </aura:if>
+            <!-- END SPINNER -->
+            
+            <!-- START ERROR MESSAGE -->
+            <aura:if isTrue="{!v.isError == true}">
+                <div class="slds-grid slds-wrap container">
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_8-of-12 slds-large-size_8-of-12 slds-p-around_medium">
+                        <div class="widget">
+                            <p>
+                                <div class="slds-text-heading_medium">
+                                    Ops. We are unable to load this page.
+                                </div>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </aura:if>
+            <!-- END ERROR MESSAGE --> 
+            <aura:if isTrue="{!v.isError == false}">
+                <div class="slds-grid slds-wrap" > 
+                    <div class="slds-col slds-size_1-of-1">
+                        <lightning:datatable data="{!v.thisPageOppList}" 
+                                             columns="{!v.acccolumns}" 
+                                             keyField="Id" 
+                                             hideCheckboxColumn="false" 
+                                             onsort="{!c.updateColumnSorting}" 
+                                             sortedBy="{!v.sortedBy}"   
+                                             sortedDirection="{!v.sortedDirection}"
+                                             selectedRows="{!v.selection}"
+											 onrowselection="{!c.UpdateSelectedRows}"
+                                             aura:id="appList"/>
+                    </div>
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_4-of-12 slds-large-size_4-of-12 slds-p-around_small">
+                        <aura:if isTrue="{!v.pagesTotalRecord > 0}">
+                            Showing {! v.pagesStartRecord} - {! v.pagesEndRecord} out of {!v.pagesTotalRecord} Agent Records.
+                            <aura:set attribute="else">
+                                No Agent Records available for the current selection
+                            </aura:set>
+                        </aura:if>
+                    </div>
+                    
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_4-of-12 slds-large-size_4-of-12 slds-p-around_small">
+                        <!--ul class="slds-button-group-list slds-float_right add-top-padding"-->
+                        <ul class="slds-button-group-list">
+                            <li>
+                                <lightning:button variant="Neutral"
+                                                  label="First"
+                                                  disabled="{!v.currentPage == 1 || v.currentPage == 0 || v.isSending == true}" 
+                                                  onclick="{!c.getPageOpps}" 
+                                                  value="1"/>
+                            </li>
+                            <li>
+                                <lightning:buttonIcon iconName="utility:chevronleft"  
+                                                      variant="border-filled" 
+                                                      alternativeText="Previous" 
+                                                      disabled="{!v.currentPage == 1 || v.currentPage == 0 || v.isSending == true}" 
+                                                      onclick="{!c.getPageOpps}" 
+                                                      value="{! v.currentPage - 1}"/>
+                            </li>
+                            <aura:iteration items="{!v.pagesArray}" var="page">
+                                <li class="slds-show_medium">
+                                    <lightning:button variant="Neutral"
+                                                      label="{!page}"
+                                                      disabled="{!v.currentPage == page || v.currentPage == 0 || v.isSending == true}" 
+                                                      onclick="{!c.getPageOpps}" 
+                                                      value="{!page}"
+                                                      class="{!v.currentPage == page ? 'is-active' : ''}"/>
+                                </li>   
+                            </aura:iteration>
+                            <li>
+                                <lightning:buttonIcon iconName="utility:chevronright"  
+                                                      variant="border-filled" 
+                                                      alternativeText="Previous" 
+                                                      disabled="{!v.currentPage == v.totalPages || v.currentPage == 0 || v.isSending == true}" 
+                                                      onclick="{!c.getPageOpps}" 
+                                                      value="{! v.currentPage + 1}"/>
+                            </li>
+                            <li>
+                                <lightning:button variant="Neutral"
+                                                  label="Last"
+                                                  disabled="{!v.currentPage == v.totalPages || v.currentPage == 0 || v.isSending == true}" 
+                                                  onclick="{!c.getPageOpps}" 
+                                                  value="{!v.totalPages}"/>
+                            </li>
+                        </ul>                
+                    </div>
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_4-of-12 slds-large-size_4-of-12 slds-p-around_small">
+                        <lightning:button label="Mass assign teams" variant="brand" 
+                                      onclick="{!c.submitSelectedRecords}" disabled="{!(empty(v.accounts))}"/>
+                    </div>
+                </div> 
+            </aura:if>
+        </div>
+            
+        </div> 
+        
+    </article>
+    <div> 
+        <article class="slds-card">
+            
+        </article>
+    </div>
+</aura:component>
